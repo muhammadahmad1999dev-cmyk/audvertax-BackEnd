@@ -11,6 +11,10 @@ import {
   updateUserPaymentStatusController,
   updateAdminApplicationStatusController,
 } from "./admin.controller.js";
+import {
+  staffDocumentUploadMiddleware,
+  uploadStaffDocument,
+} from "../staff/staff.routes.js";
 
 export const adminRoutes = Router();
 
@@ -22,4 +26,12 @@ adminRoutes.get("/users", listAdminUsersController);
 adminRoutes.patch("/users/:id/payment-status", updateUserPaymentStatusController);
 adminRoutes.get("/applications", listAdminApplicationsController);
 adminRoutes.get("/applications/:id", getAdminApplicationController);
+adminRoutes.post(
+  "/applications/:applicationId/documents",
+  staffDocumentUploadMiddleware.fields([
+    { name: "file", maxCount: 1 },
+    { name: "document", maxCount: 1 },
+  ]),
+  uploadStaffDocument,
+);
 adminRoutes.patch("/applications/:id/status", requireAdmin, updateAdminApplicationStatusController);
