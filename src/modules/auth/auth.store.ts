@@ -121,6 +121,11 @@ export const userStore = {
     if (error) throw error;
     return data ? fromUserRow(data as UserRow) : null;
   },
+
+  async delete(id: string) {
+    const { error } = await supabase.from("users").delete().eq("id", id);
+    if (error) throw error;
+  },
 };
 
 export const sessionStore = {

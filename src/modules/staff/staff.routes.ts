@@ -125,13 +125,29 @@ export async function deleteStaffDocument(req: Request, res: Response, next: Nex
 			return;
 		}
 
-		const staffUploads = Array.isArray(application.documents.staffUploads)
-			? application.documents.staffUploads
-			: [];
-		const document = staffUploads.find(
-			(candidate): candidate is Record<string, unknown> =>
-				Boolean(candidate) && typeof candidate === "object" && candidate.id === documentId,
-		);
+		const findDocument = (value: unknown): Record<string, unknown> | null => {
+			if (!value || typeof value !== "object") return null;
+			if (Array.isArray(value)) {
+				for (const item of value) {
+					const document = findDocument(item);
+					if (document) return document;
+				}
+				return null;
+			}
+			const record = value as Record<string, unknown>;
+			if (record.id === documentId) return record;
+			for (const child of Object.values(record)) {
+				const document = findDocument(child);
+				if (document) return document;
+			}
+			return null;
+		};
+
+		const searchableDocuments =
+			res.locals.user.role === "admin"
+				? application.documents
+				: { staffUploads: application.documents.staffUploads };
+		const document = findDocument(searchableDocuments);
 		if (!document) {
 			res.status(404).json({
 				success: false,
@@ -145,12 +161,42 @@ export async function deleteStaffDocument(req: Request, res: Response, next: Nex
 			if (error) throw error;
 		}
 
-		const updated = await applicationStore.update(application.id, {
-			documents: {
-				...application.documents,
-				staffUploads: staffUploads.filter((candidate) => candidate !== document),
-			},
-		});
+		const documents = structuredClone(application.documents) as Record<string, unknown>;
+		const removeDocument = (value: unknown): boolean => {
+			if (!value || typeof value !== "object") return false;
+			if (Array.isArray(value)) {
+				for (let index = value.length - 1; index >= 0; index -= 1) {
+					const item = value[index];
+					if (
+						item &&
+						typeof item === "object" &&
+						(item as Record<string, unknown>).id === documentId
+					) {
+						value.splice(index, 1);
+						return true;
+					}
+					if (removeDocument(item)) return true;
+				}
+				return false;
+			}
+			const record = value as Record<string, unknown>;
+			for (const [key, child] of Object.entries(record)) {
+				if (
+					child &&
+					typeof child === "object" &&
+					!Array.isArray(child) &&
+					(child as Record<string, unknown>).id === documentId
+				) {
+					delete record[key];
+					return true;
+				}
+				if (removeDocument(child)) return true;
+			}
+			return false;
+		};
+		removeDocument(documents);
+
+		const updated = await applicationStore.update(application.id, { documents });
 
 		res.json({ success: true, data: { application: updated } });
 	} catch (error) {

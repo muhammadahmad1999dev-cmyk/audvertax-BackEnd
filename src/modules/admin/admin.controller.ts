@@ -90,10 +90,10 @@ export async function removeStaffController(req: Request, res: Response) {
     return;
   }
 
-  await userStore.update(staff.id, { role: "customer" });
+  await userStore.delete(staff.id);
   res.json({
     success: true,
-    data: { message: "Staff account removed successfully." },
+    data: { message: "Staff account and related data were permanently deleted." },
   });
 }
 
