@@ -13,6 +13,7 @@ import {
 } from "./admin.controller.js";
 import {
   staffDocumentUploadMiddleware,
+  deleteStaffDocument,
   uploadStaffDocument,
 } from "../staff/staff.routes.js";
 
@@ -33,5 +34,9 @@ adminRoutes.post(
     { name: "document", maxCount: 1 },
   ]),
   uploadStaffDocument,
+);
+adminRoutes.delete(
+  "/applications/:applicationId/documents/:documentId",
+  deleteStaffDocument,
 );
 adminRoutes.patch("/applications/:id/status", requireAdmin, updateAdminApplicationStatusController);

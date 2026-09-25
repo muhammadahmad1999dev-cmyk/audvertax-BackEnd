@@ -190,56 +190,55 @@ staffRoutes.post(
 >>>>>>> ac6b2df (update)
 );
 
-staffRoutes.delete(
-	"/applications/:applicationId/documents/:documentId",
-	async (req, res, next) => {
-		try {
-			const applicationId = Array.isArray(req.params.applicationId)
-				? req.params.applicationId[0]
-				: req.params.applicationId;
-			const documentId = Array.isArray(req.params.documentId)
-				? req.params.documentId[0]
-				: req.params.documentId;
-			const application = await applicationStore.findById(applicationId);
-			const billing = application ? await findOrder(application.id, application.userId) : null;
-			if (!application || (res.locals.user.role === "staff" && billing?.status !== "paid")) {
-				res.status(404).json({
-					success: false,
-					error: { code: "APPLICATION_NOT_FOUND", message: "Application not found." },
-				});
-				return;
-			}
-
-			const staffUploads = Array.isArray(application.documents.staffUploads)
-				? application.documents.staffUploads
-				: [];
-			const document = staffUploads.find(
-				(candidate): candidate is Record<string, unknown> =>
-					Boolean(candidate) && typeof candidate === "object" && candidate.id === documentId,
-			);
-			if (!document) {
-				res.status(404).json({
-					success: false,
-					error: { code: "DOCUMENT_NOT_FOUND", message: "Document not found." },
-				});
-				return;
-			}
-
-			if (typeof document.path === "string") {
-				const { error } = await supabase.storage.from(BUCKET).remove([document.path]);
-				if (error) throw error;
-			}
-
-			const updated = await applicationStore.update(application.id, {
-				documents: {
-					...application.documents,
-					staffUploads: staffUploads.filter((candidate) => candidate !== document),
-				},
+export async function deleteStaffDocument(req: Request, res: Response, next: NextFunction) {
+	try {
+		const applicationId = Array.isArray(req.params.applicationId)
+			? req.params.applicationId[0]
+			: req.params.applicationId;
+		const documentId = Array.isArray(req.params.documentId)
+			? req.params.documentId[0]
+			: req.params.documentId;
+		const application = await applicationStore.findById(applicationId);
+		const billing = application ? await findOrder(application.id, application.userId) : null;
+		if (!application || (res.locals.user.role === "staff" && billing?.status !== "paid")) {
+			res.status(404).json({
+				success: false,
+				error: { code: "APPLICATION_NOT_FOUND", message: "Application not found." },
 			});
-
-			res.json({ success: true, data: { application: updated } });
-		} catch (error) {
-			next(error);
+			return;
 		}
-	},
-);
+
+		const staffUploads = Array.isArray(application.documents.staffUploads)
+			? application.documents.staffUploads
+			: [];
+		const document = staffUploads.find(
+			(candidate): candidate is Record<string, unknown> =>
+				Boolean(candidate) && typeof candidate === "object" && candidate.id === documentId,
+		);
+		if (!document) {
+			res.status(404).json({
+				success: false,
+				error: { code: "DOCUMENT_NOT_FOUND", message: "Document not found." },
+			});
+			return;
+		}
+
+		if (typeof document.path === "string") {
+			const { error } = await supabase.storage.from(BUCKET).remove([document.path]);
+			if (error) throw error;
+		}
+
+		const updated = await applicationStore.update(application.id, {
+			documents: {
+				...application.documents,
+				staffUploads: staffUploads.filter((candidate) => candidate !== document),
+			},
+		});
+
+		res.json({ success: true, data: { application: updated } });
+	} catch (error) {
+		next(error);
+	}
+}
+
+staffRoutes.delete("/applications/:applicationId/documents/:documentId", deleteStaffDocument);
