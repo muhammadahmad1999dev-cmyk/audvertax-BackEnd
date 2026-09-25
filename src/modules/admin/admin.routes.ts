@@ -35,8 +35,5 @@ adminRoutes.post(
   ]),
   uploadStaffDocument,
 );
-adminRoutes.delete(
-  "/applications/:applicationId/documents/:documentId",
-  deleteStaffDocument,
-);
+adminRoutes.delete("/applications/:applicationId/documents/:documentId", deleteStaffDocument);
 adminRoutes.patch("/applications/:id/status", requireAdmin, updateAdminApplicationStatusController);
