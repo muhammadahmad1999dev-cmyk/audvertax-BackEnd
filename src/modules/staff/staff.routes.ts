@@ -163,9 +163,10 @@ export async function downloadStaffDocument(req: Request, res: Response, next: N
       return;
     }
 
-    const filename = String(document.name ?? document.documentName ?? documentId)
-      .replace(/[\r\n"\\/]/g, "_")
-      .trim() || documentId;
+    const filename =
+      String(document.name ?? document.documentName ?? documentId)
+        .replace(/[\r\n"\\/]/g, "_")
+        .trim() || documentId;
     res.setHeader("Content-Type", String(document.type ?? "application/octet-stream"));
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(Buffer.from(await data.arrayBuffer()));
@@ -174,10 +175,7 @@ export async function downloadStaffDocument(req: Request, res: Response, next: N
   }
 }
 
-staffRoutes.get(
-  "/applications/:applicationId/documents/:documentId",
-  downloadStaffDocument,
-);
+staffRoutes.get("/applications/:applicationId/documents/:documentId", downloadStaffDocument);
 
 export async function deleteStaffDocument(req: Request, res: Response, next: NextFunction) {
   try {
