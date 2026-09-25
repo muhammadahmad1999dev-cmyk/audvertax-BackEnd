@@ -14,6 +14,7 @@ import {
 import {
   staffDocumentUploadMiddleware,
   deleteStaffDocument,
+  downloadStaffDocument,
   uploadStaffDocument,
 } from "../staff/staff.routes.js";
 
@@ -35,8 +36,9 @@ adminRoutes.post(
   ]),
   uploadStaffDocument,
 );
-adminRoutes.delete(
+adminRoutes.get(
   "/applications/:applicationId/documents/:documentId",
-  deleteStaffDocument,
+  downloadStaffDocument,
 );
+adminRoutes.delete("/applications/:applicationId/documents/:documentId", deleteStaffDocument);
 adminRoutes.patch("/applications/:id/status", requireAdmin, updateAdminApplicationStatusController);
