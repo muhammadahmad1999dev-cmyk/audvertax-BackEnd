@@ -35,13 +35,7 @@ adminRoutes.post(
   ]),
   uploadStaffDocument,
 );
-adminRoutes.get(
-  "/applications/:applicationId/documents/:documentId",
-  downloadStaffDocument,
-);
-adminRoutes.delete(
-  "/applications/:applicationId/documents/:documentId",
-  deleteStaffDocument,
-);
+adminRoutes.get("/applications/:applicationId/documents/:documentId", downloadStaffDocument);
+adminRoutes.delete("/applications/:applicationId/documents/:documentId", deleteStaffDocument);
 adminRoutes.get("/applications/:id", getAdminApplicationController);
 adminRoutes.patch("/applications/:id/status", requireAdmin, updateAdminApplicationStatusController);
