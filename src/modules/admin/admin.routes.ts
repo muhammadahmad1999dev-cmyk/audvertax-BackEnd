@@ -12,9 +12,9 @@ import {
   updateAdminApplicationStatusController,
 } from "./admin.controller.js";
 import {
-  staffDocumentUploadMiddleware,
   deleteStaffDocument,
   downloadStaffDocument,
+  staffDocumentUploadMiddleware,
   uploadStaffDocument,
 } from "../staff/staff.routes.js";
 
@@ -27,7 +27,6 @@ adminRoutes.delete("/staff/:id", requireAdmin, removeStaffController);
 adminRoutes.get("/users", listAdminUsersController);
 adminRoutes.patch("/users/:id/payment-status", updateUserPaymentStatusController);
 adminRoutes.get("/applications", listAdminApplicationsController);
-adminRoutes.get("/applications/:id", getAdminApplicationController);
 adminRoutes.post(
   "/applications/:applicationId/documents",
   staffDocumentUploadMiddleware.fields([
@@ -36,6 +35,13 @@ adminRoutes.post(
   ]),
   uploadStaffDocument,
 );
-adminRoutes.get("/applications/:applicationId/documents/:documentId", downloadStaffDocument);
-adminRoutes.delete("/applications/:applicationId/documents/:documentId", deleteStaffDocument);
+adminRoutes.get(
+  "/applications/:applicationId/documents/:documentId",
+  downloadStaffDocument,
+);
+adminRoutes.delete(
+  "/applications/:applicationId/documents/:documentId",
+  deleteStaffDocument,
+);
+adminRoutes.get("/applications/:id", getAdminApplicationController);
 adminRoutes.patch("/applications/:id/status", requireAdmin, updateAdminApplicationStatusController);

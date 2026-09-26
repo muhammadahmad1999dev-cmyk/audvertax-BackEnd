@@ -8,12 +8,7 @@ import {
 } from "./admin.application.service.js";
 import { applicationStore } from "../applications/application.store.js";
 import { userStore } from "../auth/auth.store.js";
-import {
-  findOrder,
-  listOrdersByUser,
-  listPaidOrders,
-  updateOrder,
-} from "../billing/billing.store.js";
+import { findOrder, listOrdersByUser, listPaidOrders, updateOrder } from "../billing/billing.store.js";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../core/errors.js";
 
@@ -90,10 +85,10 @@ export async function removeStaffController(req: Request, res: Response) {
     return;
   }
 
-  await userStore.delete(staff.id);
+  await userStore.update(staff.id, { role: "customer" });
   res.json({
     success: true,
-    data: { message: "Staff account and related data were permanently deleted." },
+    data: { message: "Staff account removed successfully." },
   });
 }
 

@@ -12,6 +12,7 @@ import {
 import { applicationStore } from "../applications/application.store.js";
 import { findOrder } from "../billing/billing.store.js";
 import { supabase } from "../../config/supabase.js";
+import { logger } from "../../utils/logger.js";
 
 const BUCKET = "application-documents";
 export const staffDocumentUploadMiddleware = multer({
@@ -66,9 +67,6 @@ export async function uploadStaffDocument(req: Request, res: Response, next: Nex
       });
     if (uploadError) throw uploadError;
 
-    const currentUploads = Array.isArray(application.documents.staffUploads)
-      ? application.documents.staffUploads
-      : [];
     const document = {
       id: documentId,
       name: documentName,
@@ -81,9 +79,29 @@ export async function uploadStaffDocument(req: Request, res: Response, next: Nex
       uploadedByName: `${res.locals.user.firstName} ${res.locals.user.lastName}`.trim(),
       uploadedAt: new Date().toISOString(),
     };
-    const updated = await applicationStore.update(application.id, {
-      documents: { ...application.documents, staffUploads: [...currentUploads, document] },
-    });
+    let updated;
+    try {
+      updated = await applicationStore.appendStaffDocument(application.id, document);
+    } catch (error) {
+      try {
+        await supabase.storage.from(BUCKET).remove([storagePath]);
+      } catch (cleanupError) {
+        logger.warn(
+          { err: cleanupError },
+          "Failed to clean up document storage after metadata write failure",
+        );
+      }
+      throw error;
+    }
+
+    if (!updated) {
+      await supabase.storage.from(BUCKET).remove([storagePath]);
+      res.status(404).json({
+        success: false,
+        error: { code: "APPLICATION_NOT_FOUND", message: "Paid application not found." },
+      });
+      return;
+    }
 
     res.status(201).json({ success: true, data: { document, application: updated } });
   } catch (error) {
@@ -186,7 +204,10 @@ export async function deleteStaffDocument(req: Request, res: Response, next: Nex
       ? req.params.documentId[0]
       : req.params.documentId;
     const application = await applicationStore.findById(applicationId);
-    const billing = application ? await findOrder(application.id, application.userId) : null;
+    const billing =
+      application && res.locals.user.role === "staff"
+        ? await findOrder(application.id, application.userId)
+        : null;
     if (!application || (res.locals.user.role === "staff" && billing?.status !== "paid")) {
       res.status(404).json({
         success: false,
@@ -195,29 +216,20 @@ export async function deleteStaffDocument(req: Request, res: Response, next: Nex
       return;
     }
 
-    const findDocument = (value: unknown): Record<string, unknown> | null => {
-      if (!value || typeof value !== "object") return null;
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          const document = findDocument(item);
-          if (document) return document;
-        }
-        return null;
-      }
-      const record = value as Record<string, unknown>;
-      if (record.id === documentId) return record;
-      for (const child of Object.values(record)) {
-        const document = findDocument(child);
-        if (document) return document;
-      }
-      return null;
-    };
+    const result = await applicationStore.deleteDocumentById(
+      application.id,
+      documentId,
+      res.locals.user.role === "staff",
+    );
+    if (!result.application) {
+      res.status(404).json({
+        success: false,
+        error: { code: "APPLICATION_NOT_FOUND", message: "Application not found." },
+      });
+      return;
+    }
 
-    const searchableDocuments =
-      res.locals.user.role === "admin"
-        ? application.documents
-        : { staffUploads: application.documents.staffUploads };
-    const document = findDocument(searchableDocuments);
+    const document = result.deletedDocument;
     if (!document) {
       res.status(404).json({
         success: false,
@@ -227,48 +239,24 @@ export async function deleteStaffDocument(req: Request, res: Response, next: Nex
     }
 
     if (typeof document.path === "string") {
-      const { error } = await supabase.storage.from(BUCKET).remove([document.path]);
-      if (error) throw error;
+      const documentKey = `${application.id}/${documentId}`;
+      const suffix = document.path.startsWith(documentKey)
+        ? document.path.slice(documentKey.length)
+        : null;
+      if (suffix !== null && (suffix === "" || /^\.[a-zA-Z0-9]+$/.test(suffix))) {
+        const { error } = await supabase.storage.from(BUCKET).remove([document.path]);
+        if (error) throw error;
+      }
     }
 
-    const documents = structuredClone(application.documents) as Record<string, unknown>;
-    const removeDocument = (value: unknown): boolean => {
-      if (!value || typeof value !== "object") return false;
-      if (Array.isArray(value)) {
-        for (let index = value.length - 1; index >= 0; index -= 1) {
-          const item = value[index];
-          if (
-            item &&
-            typeof item === "object" &&
-            (item as Record<string, unknown>).id === documentId
-          ) {
-            value.splice(index, 1);
-            return true;
-          }
-          if (removeDocument(item)) return true;
-        }
-        return false;
-      }
-      const record = value as Record<string, unknown>;
-      for (const [key, child] of Object.entries(record)) {
-        if (
-          child &&
-          typeof child === "object" &&
-          !Array.isArray(child) &&
-          (child as Record<string, unknown>).id === documentId
-        ) {
-          delete record[key];
-          return true;
-        }
-        if (removeDocument(child)) return true;
-      }
-      return false;
-    };
-    removeDocument(documents);
-
-    const updated = await applicationStore.update(application.id, { documents });
-
-    res.json({ success: true, data: { application: updated } });
+    res.json({
+      success: true,
+      data: {
+        deletedDocumentId: documentId,
+        documents: result.application.documents,
+        application: result.application,
+      },
+    });
   } catch (error) {
     next(error);
   }
